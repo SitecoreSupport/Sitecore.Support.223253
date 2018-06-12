@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -19,16 +20,25 @@ namespace Sitecore.Support.DataExchange.Providers.XConnect.Processors.PipelineSt
     {
       ParameterExpression expression;
       var baseExpression = base.GetContactFilterExpression(pipelineStep, pipelineContext, logger);
-      var drExpression = this.GetDateRangeExpression(pipelineContext, out expression);
 
-      ParameterExpression[] parameters = new ParameterExpression[] { expression };
-
+      var parameters = baseExpression?.Parameters;
+      if (parameters == null)
+      {
+        var paramList = new List<ParameterExpression>();
+        paramList.Add(Expression.Parameter(typeof(Entity), "entity"));
+        parameters = new ReadOnlyCollection<ParameterExpression>(paramList);
+      }
+      
+      var drExpression = this.GetDateRangeExpression(pipelineContext, parameters[0]);
+      
+      
       return Expression.Lambda<Func<Contact, bool>>(Expression.And(baseExpression?.Body??Expression.Constant(true), drExpression), parameters);
     }
 
-    protected virtual Expression GetDateRangeExpression(PipelineContext pipelineContext, out ParameterExpression expression)
+    protected virtual Expression GetDateRangeExpression(PipelineContext pipelineContext, ParameterExpression expression)
     {
-      var lastmodified = Expression.Convert(Expression.PropertyOrField(expression = Expression.Parameter(typeof(Contact), "contact"), "LastModified"), typeof(DateTime));
+      
+      var lastmodified = Expression.Convert(Expression.PropertyOrField(expression , "LastModified"), typeof(DateTime));
       var drplugin = pipelineContext.GetPlugin<DateRangeSettings>();
       if (drplugin == null)
       {
